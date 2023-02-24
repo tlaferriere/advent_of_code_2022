@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::hash::Hash;
 
@@ -52,6 +52,28 @@ enum Cd {
 
 fn main() -> std::io::Result<()> {
     let f = File::open("input.txt")?;
+
+    let fs = parse_fs_navigation(f)?;
+
+    // Find dirs of at most 100000 size
+    const FS_SIZE: u64 = 70000000;
+    const REQUIRED_FREE_SPACE: u64 = 30000000;
+
+    let mut size_cache = HashMap::new();
+    let root = PathBuf::from("/");
+    let mut total_size = fs.get(&root).unwrap().size(&fs, &mut size_cache);
+    let space_to_free = REQUIRED_FREE_SPACE - (FS_SIZE - total_size);
+
+    let mut eligible_dirs: Vec<_> = size_cache
+        .iter()
+        .filter(|(_, size)| **size >= space_to_free)
+        .collect();
+    eligible_dirs.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
+    println!("{}", eligible_dirs.first().unwrap().1);
+    Ok(())
+}
+
+fn parse_fs_navigation(f: File) -> std::io::Result<HashMap<PathBuf, Dir>> {
     let mut reader = BufReader::new(f);
     let mut unparsed = String::new();
     reader.read_to_string(&mut unparsed)?;
@@ -104,16 +126,5 @@ fn main() -> std::io::Result<()> {
             }
         }
     }
-
-    // Find dirs of at most 100000 size
-    let mut total_size = 0;
-    let mut cache = HashMap::new();
-    for (_, mut dir) in &fs {
-        let s = dir.size(&fs, &mut cache);
-        if s < 100000 {
-            total_size += s;
-        }
-    }
-    println!("{total_size}");
-    Ok(())
+    Ok(fs)
 }
