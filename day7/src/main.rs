@@ -22,16 +22,15 @@ struct Dir {
     dirs: Vec<String>,
     #[new(default)]
     files: Vec<u64>,
-    #[new(default)]
-    cached_size: Option<u64>,
 }
 
 impl Dir {
-    fn size(&mut self, fs: &mut HashMap<PathBuf, Self>) -> u64 {
-        if let Some(s) = self.cached_size {
-            return s;
+    fn size(&self, fs: &HashMap<PathBuf, Self>, cache: &mut HashMap<PathBuf, u64>) -> u64 {
+        if let Some(s) = cache.get(&self.path) {
+            return *s;
         }
-        self.dirs
+        let i = self
+            .dirs
             .iter()
             .fold(self.files.iter().sum::<u64>(), |acc, dir| {
                 let mut dir_path = self.path.clone();
@@ -39,8 +38,10 @@ impl Dir {
                 acc + fs
                     .get(&dir_path)
                     .expect(format!("Path not found: {}", dir_path.to_str().unwrap()).as_str())
-                    .size(fs)
-            })
+                    .size(fs, cache)
+            });
+        cache.insert(self.path.clone(), i);
+        i
     }
 }
 
@@ -98,31 +99,7 @@ fn main() -> std::io::Result<()> {
             Rule::EOI => {
                 println!("Reached end of input.")
             }
-            Rule::file_name => {
-                unreachable!()
-            }
-            Rule::size => {
-                unreachable!()
-            }
-            Rule::file_node => {
-                unreachable!()
-            }
-            Rule::dir_name => {
-                unreachable!()
-            }
-            Rule::dir => {
-                unreachable!()
-            }
-            Rule::output => {
-                unreachable!()
-            }
-            Rule::cd => {
-                unreachable!()
-            }
-            Rule::exploration => {
-                unreachable!()
-            }
-            Rule::file => {
+            _ => {
                 unreachable!()
             }
         }
@@ -130,8 +107,9 @@ fn main() -> std::io::Result<()> {
 
     // Find dirs of at most 100000 size
     let mut total_size = 0;
+    let mut cache = HashMap::new();
     for (_, mut dir) in &fs {
-        let s = dir.size(&mut fs);
+        let s = dir.size(&fs, &mut cache);
         if s < 100000 {
             total_size += s;
         }
