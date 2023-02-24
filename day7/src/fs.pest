@@ -1,0 +1,11 @@
+file_name = { (LETTER | ".")+ }
+size = { ASCII_DIGIT+ }
+file_node = { size ~ " " ~ file_name }
+dir_name = { LETTER+ | "/" | ".." }
+dir = _{ "dir " ~ dir_name }
+output = _{ (file_node | dir) ~ NEWLINE }
+ls = {"$ ls" ~ NEWLINE ~ output* }
+cd = _{ "$ cd " ~ ( dir_name  ) ~ NEWLINE }
+nav = { cd+ }
+exploration = _{ nav ~ ls }
+file = _{ SOI ~ exploration* ~ EOI }
