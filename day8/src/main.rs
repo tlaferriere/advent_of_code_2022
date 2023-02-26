@@ -1,12 +1,11 @@
 #![feature(portable_simd)]
 
 use array2d::Array2D;
-use itertools::izip;
-use std::collections::HashSet;
+
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::iter::zip;
-use std::simd::{i32x4, SimdPartialEq, SimdPartialOrd};
+
+use std::simd::{u32x4, Mask, SimdPartialEq, SimdPartialOrd, SimdUint};
 
 fn main() -> std::io::Result<()> {
     let f = File::open("input.txt")?;
@@ -22,50 +21,74 @@ fn main() -> std::io::Result<()> {
         .collect();
 
     let forest = Array2D::from_rows(&forest_vecs).unwrap();
-
-    let mut visible_trees = HashSet::new();
     let rows = forest.as_rows();
     let columns = forest.as_columns();
-    for (i_row, (row, col)) in zip(rows, columns).enumerate() {
-        let j_col = i_row;
-        let mut max_height = i32x4::splat(-1);
-        for (
-            (j_row, height_row),
-            (j_row_rev, height_row_rev),
-            (i_col, height_col),
-            (i_col_rev, height_col_rev),
-        ) in izip!(
-            row.iter().enumerate(),
-            row.iter().enumerate().rev(),
-            col.iter().enumerate(),
-            col.iter().enumerate().rev()
-        ) {
-            let height = i32x4::from([
-                *height_row as i32,
-                *height_row_rev as i32,
-                *height_col as i32,
-                *height_col_rev as i32,
+
+    let mut max_scenic_score = 0;
+    let edges = u32x4::from([0, 0, forest.row_len() as u32, forest.column_len() as u32]);
+    for ((i, j), h) in forest.enumerate_row_major() {
+        if u32x4::from([i as u32, j as u32, i as u32, j as u32])
+            .simd_eq(edges)
+            .any()
+        {
+            continue;
+        }
+        let (up, down) = columns.get(j).unwrap().split_at(i);
+        let (left, right) = rows.get(i).unwrap().split_at(j);
+        let lens = [up.len(), down.len(), left.len(), right.len()];
+        let (mut up, mut down, mut left, mut right) = (
+            up.iter().rev(),
+            down.iter().skip(1),
+            left.iter().rev(),
+            right.iter().skip(1),
+        );
+        let height = u32x4::splat(*h);
+        let mut views_blocked = Mask::splat(false);
+        let mut views = u32x4::splat(0);
+        for _ in 0..itertools::max(lens).unwrap() {
+            let trees_seen = u32x4::from([
+                match up.next() {
+                    None => {
+                        views_blocked.set(0, true);
+                        0
+                    }
+                    Some(t) => *t,
+                },
+                match down.next() {
+                    None => {
+                        views_blocked.set(1, true);
+                        0
+                    }
+                    Some(t) => *t,
+                },
+                match left.next() {
+                    None => {
+                        views_blocked.set(2, true);
+                        0
+                    }
+                    Some(t) => *t,
+                },
+                match right.next() {
+                    None => {
+                        views_blocked.set(3, true);
+                        0
+                    }
+                    Some(t) => *t,
+                },
             ]);
-            let are_higher = height.simd_gt(max_height);
-            if are_higher.test(0) {
-                visible_trees.insert((i_row, j_row));
-            }
-            if are_higher.test(1) {
-                visible_trees.insert((i_row, j_row_rev));
-            }
-            if are_higher.test(2) {
-                visible_trees.insert((i_col, j_col));
-            }
-            if are_higher.test(3) {
-                visible_trees.insert((i_col_rev, j_col));
-            }
-            max_height = are_higher.select(height, max_height);
-            if max_height.simd_eq(i32x4::splat(9)).all() {
+            let inc = views_blocked.select(u32x4::splat(0), u32x4::splat(1));
+            views += inc;
+
+            let higher_trees = trees_seen.simd_ge(height);
+            views_blocked = higher_trees.select_mask(Mask::splat(true), views_blocked);
+            if views_blocked.all() {
                 break;
             }
         }
+        let scenic_score = views.reduce_product();
+        max_scenic_score = std::cmp::max(scenic_score, max_scenic_score);
     }
 
-    println!("{}", visible_trees.len());
+    println!("{}", max_scenic_score);
     Ok(())
 }
