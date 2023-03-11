@@ -8,50 +8,57 @@ fn main() -> std::io::Result<()> {
     let mut lines = reader.lines();
     let mut registers = Default::default();
     let mut alu_state = AluState::Ready(registers);
-    let mut signal_strength_sum = 0;
-    for i in 1..=220 {
-        registers = match alu_state {
-            AluState::Ready(result) => {
-                let Some(line) = lines.next() else { break; };
-                let instruction: Instruction = line.unwrap().parse().unwrap();
-                match instruction {
-                    Instruction::Noop => {
-                        alu_state = AluState::Ready(result);
-                    }
-                    Instruction::Add(n) => {
-                        alu_state = AluState::Busy {
-                            cycles_left: 1,
-                            result: Registers { x: result.x + n },
+    let mut crt_out = String::new();
+    for _ in 0..6 {
+        for i in 0..40 {
+            registers = match alu_state {
+                AluState::Ready(result) => {
+                    let instruction: Instruction = lines
+                        .next()
+                        .expect("Ran out of instructions before end of screen")
+                        .unwrap()
+                        .parse()
+                        .unwrap();
+                    match instruction {
+                        Instruction::Noop => {
+                            alu_state = AluState::Ready(result);
+                        }
+                        Instruction::Add(n) => {
+                            alu_state = AluState::Busy {
+                                cycles_left: 1,
+                                result: Registers { x: result.x + n },
+                            }
                         }
                     }
+                    result
                 }
-                result
-            }
-            AluState::Busy {
-                cycles_left: 1,
-                result,
-            } => {
-                alu_state = AluState::Ready(result);
-                registers
-            }
-            AluState::Busy {
-                cycles_left,
-                result,
-            } => {
-                alu_state = AluState::Busy {
-                    cycles_left: cycles_left - 1,
+                AluState::Busy {
+                    cycles_left: 1,
                     result,
-                };
-                registers
-            }
-        };
-        let signal_strength = i * registers.x;
-        if (i - 20) % 40 == 0 {
-            signal_strength_sum += signal_strength;
+                } => {
+                    alu_state = AluState::Ready(result);
+                    registers
+                }
+                AluState::Busy {
+                    cycles_left,
+                    result,
+                } => {
+                    alu_state = AluState::Busy {
+                        cycles_left: cycles_left - 1,
+                        result,
+                    };
+                    registers
+                }
+            };
+            crt_out.push(if i >= registers.x - 1 && i <= registers.x + 1 {
+                '#'
+            } else {
+                '.'
+            });
         }
-        println!("cycle = {i}, alu = {alu_state:?}, signal_strength = {signal_strength}, signal_strength_sum = {signal_strength_sum}")
+        crt_out.push('\n');
     }
-    println!("{signal_strength_sum}");
+    print!("{crt_out}");
     Ok(())
 }
 
