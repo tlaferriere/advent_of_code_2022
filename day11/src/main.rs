@@ -1,5 +1,6 @@
 use regex::Regex;
 use sort_by_derive::SortBy;
+use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
@@ -7,7 +8,7 @@ use std::iter::zip;
 use std::str::FromStr;
 
 fn main() -> std::io::Result<()> {
-    let f = File::open("test.txt")?;
+    let f = File::open("input.txt")?;
     let mut reader = BufReader::new(f);
     let mut input = String::new();
     reader.read_to_string(&mut input)?;
@@ -18,7 +19,7 @@ fn main() -> std::io::Result<()> {
         .map(|s| s.parse::<Monkey>().unwrap())
         .collect();
     for _ in 0..20 {
-        let mut checked_monkeys: VecDeque<_> = Default::default();
+        let mut checked_monkeys: VecDeque<_> = VecDeque::new();
         for i in 0..monkeys.len() {
             let mut monkey = monkeys.pop_front().unwrap();
             for item in &monkey.items {
@@ -28,32 +29,37 @@ fn main() -> std::io::Result<()> {
                 } else {
                     monkey.test.false_action
                 };
-                if action_index > i {
-                    monkeys.get_mut(action_index - i)
-                } else if action_index < i {
-                    checked_monkeys.get_mut(action_index)
-                } else {
-                    panic!("Monkey can't throw to itself")
+                match action_index.cmp(&i) {
+                    Ordering::Greater => monkeys.get_mut(action_index - (i + 1)),
+                    Ordering::Less => checked_monkeys.get_mut(action_index),
+                    Ordering::Equal => {
+                        panic!("Monkey can't throw to itself")
+                    }
                 }
                 .unwrap()
                 .items
                 .push(worry_level);
             }
             monkey.num_inspections += monkey.items.len();
+            monkey.items = Default::default(); // Empty the items list
             checked_monkeys.push_back(monkey)
         }
-        let monkeys = checked_monkeys;
+        monkeys = checked_monkeys;
         for (i, monkey) in monkeys.iter().enumerate() {
             println!("Monkey {i}: {:?}", monkey.items);
         }
     }
-    let monkey_business = sorted_monkeys.pop().unwrap().num_inspections
-        * sorted_monkeys.pop().unwrap().num_inspections;
+    let mut sorted_monkeys: Vec<_> = monkeys.iter().cloned().collect();
+    sorted_monkeys.sort();
+    let i1 = sorted_monkeys.pop().unwrap().num_inspections;
+    let i2 = sorted_monkeys.pop().unwrap().num_inspections;
+    println!("Inspections: {i1:?}, {i2:?}");
+    let monkey_business = i1 * i2;
     print!("{monkey_business}");
     Ok(())
 }
 
-#[derive(Clone, SortBy)]
+#[derive(Clone, SortBy, Debug)]
 struct Monkey {
     #[sort_by]
     num_inspections: usize,
@@ -95,7 +101,7 @@ impl FromStr for Monkey {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Operation {
     op: Op,
     other: OpArg,
@@ -117,7 +123,7 @@ impl Operation {
                 }
             }
         };
-        (worry_increase as f32 / 3.0).round() as u32
+        (worry_increase as f32 / 3.0).floor() as u32
     }
 }
 
@@ -133,7 +139,7 @@ impl FromStr for Operation {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Op {
     Add,
     Mul,
@@ -151,7 +157,7 @@ impl FromStr for Op {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum OpArg {
     Const(u32),
     Itself,
@@ -168,7 +174,7 @@ impl FromStr for OpArg {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Test {
     div_by: u32,
     true_action: usize,
