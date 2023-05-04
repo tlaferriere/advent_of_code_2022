@@ -1,24 +1,13 @@
 mod monkey;
 mod worry_level;
-
 use crate::worry_level::WorryLevel;
-
+use monkey::Monkey;
 use primal::Sieve;
 use regex::Regex;
-use sort_by_derive::SortBy;
-use std::cmp::Ordering;
 use std::collections::VecDeque;
-use std::fmt::Debug;
 use std::fs::File;
-use std::hash::Hash;
 use std::io::{BufReader, Read};
-use std::iter::successors;
-
-use std::ops::Mul;
 use std::rc::Rc;
-
-use monkey::Monkey;
-use std::str::FromStr;
 
 fn main() -> std::io::Result<()> {
     let f = File::open("test.txt")?;
