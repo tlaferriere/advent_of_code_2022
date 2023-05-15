@@ -27,12 +27,12 @@ fn main() -> std::io::Result<()> {
             max_div_by = monkey.test.div_by;
         }
     }
-    let sieve = Rc::new(Sieve::new((max_div_by as f32).sqrt().ceil() as usize));
+    let sieve = Rc::new(Sieve::new(max_div_by));
     let mut monkeys: VecDeque<Monkey<WorryLevel>> = monkeys
         .iter()
         .map(|m| Monkey::from((m.clone(), &sieve)))
         .collect();
-    for r in 0..10_000 {
+    for r in 1..=10_000 {
         let mut checked_monkeys: VecDeque<_> = VecDeque::new();
         for i in 0..monkeys.len() {
             let mut monkey = monkeys.pop_front().unwrap();
@@ -40,7 +40,7 @@ fn main() -> std::io::Result<()> {
             checked_monkeys.push_back(monkey)
         }
         monkeys = checked_monkeys;
-        if (r + 1) % 1000 == 0 || r == 20 {
+        if r % 1000 == 0 || r == 20 || r == 1 {
             println!("== After round {r} ==");
             for (i, monkey) in monkeys.iter().enumerate() {
                 println!(

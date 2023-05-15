@@ -12,37 +12,20 @@ pub(crate) struct WorryLevel {
 
 impl WorryLevel {
     pub(crate) fn divisible_by(&self, other: &WorryLevel) -> bool {
-        let mut self_iter = self.value.iter();
-        for (prime, pow) in &other.value {
-            if let None = self_iter.find(|(pr, po)| pr == prime && pow <= po) {
-                return false;
-            }
-        }
-        true
+        // All the numbers are prime
+        assert_eq!(other.value.len(), 1);
+        let (prime, pow) = other.value[0];
+        assert_eq!(pow, 1);
+        self.value.iter().any(|(pr, _)| *pr == prime)
     }
 }
 
 impl From<(usize, &Rc<Sieve>)> for WorryLevel {
     fn from((val, sieve): (usize, &Rc<Sieve>)) -> Self {
         Self {
-            value: match sieve.factor(val) {
-                Ok(val) => val,
-                Err((_, val)) => val,
-            },
+            value: sieve.factor(val).unwrap(),
             sieve: sieve.clone(),
         }
-    }
-}
-
-impl PartialEq<Self> for WorryLevel {
-    fn eq(&self, _other: &Self) -> bool {
-        todo!()
-    }
-}
-
-impl PartialOrd for WorryLevel {
-    fn partial_cmp(&self, _other: &Self) -> Option<Ordering> {
-        todo!()
     }
 }
 
@@ -57,23 +40,23 @@ impl std::ops::Add for WorryLevel {
         for (prime, pow) in rhs.value {
             match lh_map.get_mut(&prime) {
                 None => rh_multiplied *= prime.pow(pow as u32),
-                Some(&mut mut lh_pow) => {
-                    match (lh_pow).cmp(&pow) {
+                Some(lh_pow) => {
+                    match (*lh_pow).cmp(&pow) {
                         Ordering::Less => {
-                            let diff_pow = pow - lh_pow;
+                            let diff_pow = pow - *lh_pow;
                             rh_multiplied *= prime.pow(diff_pow as u32);
-                            common_primes.push((prime, lh_pow));
+                            common_primes.push((prime, *lh_pow));
                         }
                         Ordering::Equal => {
                             common_primes.push((prime, pow));
                         }
                         Ordering::Greater => {
-                            let diff_pow = lh_pow - pow;
+                            let diff_pow = *lh_pow - pow;
                             common_primes.push((prime, pow));
                             lh_multiplied *= prime.pow(diff_pow as u32);
                         }
                     }
-                    lh_pow = 0;
+                    *lh_pow = 0;
                 }
             }
         }
@@ -106,10 +89,7 @@ impl Mul for WorryLevel {
     fn mul(self, rhs: Self) -> Self::Output {
         let mut value: HashMap<_, _> = self.value.into_iter().collect();
         for (prime, pow) in rhs.value {
-            value
-                .entry(prime)
-                .and_modify(|&mut mut e| e += pow)
-                .or_insert(pow);
+            value.entry(prime).and_modify(|e| *e += pow).or_insert(pow);
         }
 
         WorryLevel {

@@ -91,8 +91,8 @@ enum OpArg<T> {
     Itself,
 }
 
-impl From<(OpArg<usize>, &Rc<Sieve>)> for OpArg<WorryLevel> {
-    fn from((arg, sieve): (OpArg<usize>, &Rc<Sieve>)) -> Self {
+impl From<(OpArg<usize>, &Sieve)> for OpArg<WorryLevel> {
+    fn from((arg, sieve): (OpArg<usize>, &Sieve)) -> Self {
         match arg {
             OpArg::Const(c) => OpArg::Const(WorryLevel::from((c, sieve))),
             OpArg::Itself => OpArg::Itself,
