@@ -1,0 +1,4 @@
+num = {DECIMAL_NUMBER+}
+list = { "[" ~ (((list | num) ~ ",")* ~ (list | num))? ~ "]" }
+pair = {list ~ NEWLINE ~ list ~ NEWLINE}
+file = _{SOI ~ (pair ~ NEWLINE)* ~ pair ~ EOI}
