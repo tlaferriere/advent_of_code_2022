@@ -88,6 +88,7 @@ name = "day13"
 version = "0.1.0"
 dependencies = [
  "derive-new",
+ "glidesort",
  "pest",
  "pest_derive",
 ]
@@ -179,6 +180,12 @@ dependencies = [
  "typenum",
  "version_check",
 ]
+
+[[package]]
+name = "glidesort"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2e102e6eb644d3e0b186fc161e4460417880a0a0b87d235f2e5b8fb30f2e9e0"
 
 [[package]]
 name = "hamming"

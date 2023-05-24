@@ -1,63 +1,88 @@
-use pest::iterators::Pairs;
+use glidesort::sort_in_vec;
+use pest::iterators::{Pair, Pairs};
 use pest::Parser;
 use pest_derive::Parser;
+use std::cmp::Ordering;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::ptr::write;
 
 #[derive(Parser)]
 #[grammar = "lists.pest"]
 pub struct ListsParser;
 
-fn are_in_order(mut left: Pairs<Rule>, mut right: Pairs<Rule>) -> Option<bool> {
-    loop {
-        match (left.next(), right.next()) {
-            (Some(l), Some(r)) => {
-                if l != r {
-                    match (l.as_rule(), r.as_rule()) {
-                        (Rule::list, Rule::list) => {
-                            if let order @ Some(_) = are_in_order(l.into_inner(), r.into_inner()) {
-                                break order;
-                            }
-                        }
-                        (Rule::list, Rule::num) => {
-                            let list = format!("[{}]", r.as_str());
-                            let r_list = ListsParser::parse(Rule::list, &list)
-                                .unwrap()
-                                .next()
-                                .unwrap();
-                            if let order @ Some(_) =
-                                are_in_order(l.into_inner(), r_list.into_inner())
-                            {
-                                break order;
-                            }
-                        }
-                        (Rule::num, Rule::list) => {
-                            let list = format!("[{}]", l.as_str());
-                            let l_list = ListsParser::parse(Rule::list, &list)
-                                .unwrap()
-                                .next()
-                                .unwrap();
-                            if let order @ Some(_) =
-                                are_in_order(l_list.into_inner(), r.into_inner())
-                            {
-                                break order;
-                            }
-                        }
-                        (Rule::num, Rule::num) => {
-                            let (l_num, r_num): (u8, u8) =
-                                (l.as_str().parse().unwrap(), r.as_str().parse().unwrap());
-                            if l_num != r_num {
-                                break Some(l_num < r_num);
-                            }
-                        }
-                        (_, _) => {
-                            unreachable!()
-                        }
+#[derive(PartialEq, Eq, Clone, Debug)]
+enum Datagram {
+    List(Vec<Datagram>),
+    Num(u8),
+}
+
+impl Display for Datagram {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Datagram::List(l) => {
+                write!(f, "[")?;
+                for packet in l {
+                    write!(f, "{packet},")?;
+                }
+                write!(f, "]")?;
+                Ok(())
+            }
+            Datagram::Num(n) => {
+                write!(f, "{n}")?;
+                Ok(())
+            }
+        }
+    }
+}
+
+impl PartialOrd for Datagram {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Datagram::Num(s), Datagram::Num(o)) => s.partial_cmp(o),
+            (Datagram::List(s), Datagram::List(o)) => {
+                let mut s_iter = s.iter();
+                let mut o_iter = o.iter();
+                loop {
+                    match (s_iter.next(), o_iter.next()) {
+                        (Some(l), Some(r)) => match l.partial_cmp(r) {
+                            ord @ Some(Ordering::Less | Ordering::Greater) => break ord,
+                            None | Some(Ordering::Equal) => continue,
+                        },
+                        (None, None) => break None,
+                        (None, Some(_)) => break Some(Ordering::Less),
+                        (Some(_), None) => break Some(Ordering::Greater),
                     }
                 }
             }
-            (None, None) => break None,
-            (l, _) => break Some(l.is_none()),
+            (l @ Datagram::List(_), Datagram::Num(r)) => {
+                l.partial_cmp(&Datagram::List(vec![Datagram::Num(*r)]))
+            }
+            (Datagram::Num(l), r @ Datagram::List(_)) => {
+                Datagram::List(vec![Datagram::Num(*l)]).partial_cmp(r)
+            }
+        }
+    }
+}
+
+impl Ord for Datagram {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.partial_cmp(other) {
+            None => Ordering::Equal,
+            Some(ord) => ord,
+        }
+    }
+}
+
+impl From<Pair<'_, Rule>> for Datagram {
+    fn from(value: Pair<Rule>) -> Self {
+        match value.as_rule() {
+            Rule::list => Datagram::List(value.into_inner().map(Datagram::from).collect()),
+            Rule::num => Datagram::Num(value.as_str().parse().expect("Not a number.")),
+            x => {
+                panic!("{x:?}")
+            }
         }
     }
 }
@@ -71,26 +96,21 @@ fn main() -> std::io::Result<()> {
         ListsParser::parse(Rule::file, unparsed.as_str()).expect("Unable to parse lists");
     // println!("{parsed:?}");
 
-    // Build up the fs representation
-    let mut sum = 0;
-    for (i, pair) in parsed.enumerate() {
-        match pair.as_rule() {
-            Rule::pair => {
-                let mut lists: Vec<_> = pair.into_inner().collect();
-                assert_eq!(lists.len(), 2);
-                let right = lists.pop().unwrap().into_inner();
-                let left = lists.pop().unwrap().into_inner();
-                if let Some(true) = are_in_order(left, right) {
-                    sum += i + 1;
-                };
-            }
-            Rule::EOI => {
-                println!("Reached end of input.")
-            }
-            _ => {
-                unreachable!()
-            }
-        }
+    let mut transmission: Vec<_> = parsed
+        .filter(|pair| matches!(pair.as_rule(), Rule::list | Rule::num))
+        .map(Datagram::from)
+        .collect();
+    let div_packet_2 = Datagram::List(vec![Datagram::List(vec![Datagram::Num(2)])]);
+    transmission.push(div_packet_2.clone());
+    let div_packet_6 = Datagram::List(vec![Datagram::List(vec![Datagram::Num(6)])]);
+    transmission.push(div_packet_6.clone());
+    sort_in_vec(&mut transmission);
+    println!("[");
+    for packet in &transmission {
+        println!("{packet},");
     }
-    Ok(println!("{sum}"))
+    println!("]");
+    let decoder_key = (transmission.binary_search(&div_packet_2).unwrap() + 1)
+        * (transmission.binary_search(&div_packet_6).unwrap() + 1);
+    Ok(println!("{decoder_key}"))
 }
