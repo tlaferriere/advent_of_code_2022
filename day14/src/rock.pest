@@ -1,0 +1,10 @@
+//
+// Created by intellij-pest on 2023-05-24
+// rocks
+// Author: tlaferriere
+//
+
+num = { NUMBER+ }
+corner = { num ~ "," ~ num }
+
+rock = { (corner ~ " -> ")+ ~ corner }
