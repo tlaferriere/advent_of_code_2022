@@ -1,6 +1,8 @@
 use pest::Parser;
 use pest_derive::Parser;
+use std::arch::x86_64::_mm256_set_epi16;
 use std::cmp::{max, min};
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -54,13 +56,13 @@ fn main() -> std::io::Result<()> {
                 // Horizontal line
                 assert_eq!(start.1, end.1);
                 for (i, j) in zip(min(start.0, end.0)..=max(start.0, end.0), repeat(start.1)) {
-                    *map.get_mut(i, j).unwrap() = Point::Rock;
+                    *map.get_mut(i, j) = Point::Rock;
                 }
             } else {
                 // Vertical line
                 assert_ne!(start.1, end.1);
                 for (i, j) in zip(repeat(start.0), min(start.1, end.1)..=max(start.1, end.1)) {
-                    *map.get_mut(i, j).unwrap() = Point::Rock;
+                    *map.get_mut(i, j) = Point::Rock;
                 }
             }
             (Some(end), corners.next())
@@ -75,18 +77,21 @@ fn main() -> std::io::Result<()> {
         let (mut x, mut y) = (SAND_X, SAND_Y);
         'grain: loop {
             for (x_fall, y_fall) in [(x, y + 1), (x - 1, y + 1), (x + 1, y + 1)] {
-                let Some(falls_to) = map.get(x_fall, y_fall) else { break 'sim };
+                let falls_to = map.get(x_fall, y_fall);
                 if let Point::Air = falls_to {
                     (x, y) = (x_fall, y_fall);
                     continue 'grain; // Grain of sand falls further
                 }
             }
             // Grain of sand has come to rest
-            *map.get_mut(x, y).unwrap() = Point::Sand;
+            *map.get_mut(x, y) = Point::Sand;
             rested_sand += 1;
+            if (x, y) == (SAND_X, SAND_Y) {
+                break 'sim; // Sand source is blocked
+            }
             break 'grain;
         }
-        dbg!(&map);
+        // dbg!(&map);
     }
 
     Ok(println!("{rested_sand}"))
@@ -130,6 +135,7 @@ struct Map {
     x_offset: isize,
     y_offset: isize,
     buf: Vec<Vec<Point>>,
+    outside: HashMap<(isize, isize), Point>,
 }
 
 impl Debug for Map {
@@ -161,18 +167,42 @@ impl<'a> Map {
             x_offset: x_min,
             y_offset: y_min,
             buf,
+            outside: HashMap::new(),
         }
     }
 
-    fn get(&'a self, x: isize, y: isize) -> Option<&'a Point> {
-        self.buf
+    fn get(&'a self, x: isize, y: isize) -> &'a Point {
+        let len = self.buf.len() as isize;
+        if let Some(point) = self
+            .buf
             .get((y - self.y_offset) as usize)
             .and_then(|row| row.get((x - self.x_offset) as usize))
+            .or_else(|| self.outside.get(&(x, y)))
+        {
+            point
+        } else if y > self.y_offset + len {
+            &Point::Rock
+        } else {
+            &Point::Air
+        }
     }
 
-    fn get_mut(&'a mut self, x: isize, y: isize) -> Option<&'a mut Point> {
-        self.buf
+    fn get_mut(&'a mut self, x: isize, y: isize) -> &'a mut Point {
+        let len = self.buf.len() as isize;
+        if let Some(point) = self
+            .buf
             .get_mut((y - self.y_offset) as usize)
             .and_then(|row| row.get_mut((x - self.x_offset) as usize))
+        {
+            point
+        } else {
+            self.outside
+                .entry((x, y))
+                .or_insert(if y > self.y_offset + len {
+                    Point::Rock
+                } else {
+                    Point::Air
+                })
+        }
     }
 }
