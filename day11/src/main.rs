@@ -10,7 +10,7 @@ use std::io::{BufReader, Read};
 use std::rc::Rc;
 
 fn main() -> std::io::Result<()> {
-    let f = File::open("test.txt")?;
+    let f = File::open("input.txt")?;
     let mut reader = BufReader::new(f);
     let mut input = String::new();
     reader.read_to_string(&mut input)?;
