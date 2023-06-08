@@ -21,16 +21,17 @@ fn main() -> std::io::Result<()> {
         .map(|s| s.parse::<Monkey<usize>>().unwrap())
         .collect();
 
+    let divs: Vec<_> = monkeys.iter().map(|monkey| monkey.test.div_by).collect();
+
     let mut max_div_by = 0;
     for monkey in &monkeys {
         if monkey.test.div_by > max_div_by {
             max_div_by = monkey.test.div_by;
         }
     }
-    let sieve = Rc::new(Sieve::new(max_div_by));
     let mut monkeys: VecDeque<Monkey<WorryLevel>> = monkeys
-        .iter()
-        .map(|m| Monkey::from((m.clone(), &sieve)))
+        .into_iter()
+        .map(|m| Monkey::from((m, &divs)))
         .collect();
     for r in 1..=10_000 {
         let mut checked_monkeys: VecDeque<_> = VecDeque::new();

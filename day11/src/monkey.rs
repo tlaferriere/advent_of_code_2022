@@ -1,11 +1,8 @@
 use crate::worry_level::WorryLevel;
-use primal::Sieve;
 use sort_by_derive::SortBy;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt::Debug;
-use std::ops::Mul;
-use std::rc::Rc;
 use std::str::FromStr;
 
 #[derive(Clone, SortBy, Debug)]
@@ -13,29 +10,22 @@ pub struct Monkey<T> {
     #[sort_by]
     pub(crate) num_inspections: usize,
     items: Vec<T>,
-    operation: Operation<T>,
-    pub(crate) test: Test<T>,
+    operation: Operation,
+    pub(crate) test: Test,
 }
 
-impl From<(Monkey<usize>, &Rc<Sieve>)> for Monkey<WorryLevel> {
-    fn from((monkey, sieve): (Monkey<usize>, &Rc<Sieve>)) -> Self {
+impl From<(Monkey<usize>, &Vec<usize>)> for Monkey<WorryLevel> {
+    fn from((monkey, divs): (Monkey<usize>, &Vec<usize>)) -> Self {
         Self {
             num_inspections: monkey.num_inspections,
             items: monkey
                 .items
                 .iter()
-                .map(|&it| WorryLevel::from((it, sieve)))
+                .map(|&it| WorryLevel::from((it, divs)))
                 .collect(),
 
-            operation: Operation {
-                op: monkey.operation.op,
-                other: OpArg::from((monkey.operation.other, sieve)),
-            },
-            test: Test {
-                div_by: WorryLevel::from((monkey.test.div_by, sieve)),
-                true_action: monkey.test.true_action,
-                false_action: monkey.test.false_action,
-            },
+            operation: monkey.operation,
+            test: monkey.test,
         }
     }
 }
@@ -73,52 +63,42 @@ impl Monkey<WorryLevel> {
     }
 }
 
-#[derive(Clone, Debug)]
-struct Operation<T> {
+#[derive(Copy, Clone, Debug)]
+struct Operation {
     op: Op,
-    other: OpArg<T>,
+    other: OpArg,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 enum Op {
     Add,
     Mul,
 }
 
-#[derive(Clone, Debug)]
-enum OpArg<T> {
-    Const(T),
+#[derive(Copy, Clone, Debug)]
+enum OpArg {
+    Const(usize),
     Itself,
 }
 
-impl From<(OpArg<usize>, &Sieve)> for OpArg<WorryLevel> {
-    fn from((arg, sieve): (OpArg<usize>, &Sieve)) -> Self {
-        match arg {
-            OpArg::Const(c) => OpArg::Const(WorryLevel::from((c, sieve))),
-            OpArg::Itself => OpArg::Itself,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct Test<T> {
-    pub(crate) div_by: T,
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct Test {
+    pub(crate) div_by: usize,
     true_action: usize,
     false_action: usize,
 }
 
-impl<T> Operation<T>
-where
-    T: Clone + std::ops::Add<Output = T> + Mul<Output = T>,
-{
-    fn eval(&self, val: T) -> T {
-        let other = match &self.other {
-            OpArg::Const(c) => c.clone(),
-            OpArg::Itself => val.clone(),
-        };
-        match self.op {
-            Op::Add => val.clone() + other,
-            Op::Mul => val * other,
+impl Operation {
+    fn eval(self, val: WorryLevel) -> WorryLevel {
+        match self.other {
+            OpArg::Const(c) => match self.op {
+                Op::Add => val + c,
+                Op::Mul => val * c,
+            },
+            OpArg::Itself => match self.op {
+                Op::Add => val * 2,
+                Op::Mul => val.pow(2),
+            },
         }
     }
 }
@@ -160,10 +140,7 @@ where
     }
 }
 
-impl<T: FromStr> FromStr for Operation<T>
-where
-    <T as FromStr>::Err: Debug,
-{
+impl FromStr for Operation {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -175,10 +152,7 @@ where
     }
 }
 
-impl<T: FromStr> FromStr for Test<T>
-where
-    <T as FromStr>::Err: Debug,
-{
+impl FromStr for Test {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -221,10 +195,7 @@ impl FromStr for Op {
     }
 }
 
-impl<T: FromStr> FromStr for OpArg<T>
-where
-    <T as FromStr>::Err: Debug,
-{
+impl FromStr for OpArg {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
