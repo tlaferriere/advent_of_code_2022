@@ -10,7 +10,4 @@ protocol = "sparse"
 
 [dependencies]
 regex = "1.7.1"
-primal = "0.3.2"
-num-integer = "0.1"
-num-traits = "0.2"
 sort_by_derive = "0.1.10"

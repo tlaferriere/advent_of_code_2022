@@ -2,12 +2,10 @@ mod monkey;
 mod worry_level;
 use crate::worry_level::WorryLevel;
 use monkey::Monkey;
-use primal::Sieve;
 use regex::Regex;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufReader, Read};
-use std::rc::Rc;
 
 fn main() -> std::io::Result<()> {
     let f = File::open("input.txt")?;

@@ -1,9 +1,5 @@
-use num_traits::Pow;
-use primal::Sieve;
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Mul;
-use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub(crate) struct WorryLevel {
